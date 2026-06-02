@@ -110,7 +110,3 @@ Planned, not yet built:
 - Cloud persistence with user auth (events across devices)
 - Keyboard shortcuts (T, N, ←/→, Esc)
 - Year stats / insights, multiple calendars/layers, JSON backup & restore
-
----
-
-🤖 Built with [Claude Code](https://claude.com/claude-code)
