@@ -11,13 +11,15 @@ import { CategoryFilter } from "@/components/CategoryFilter";
 import { DisplayOptionsDialog } from "@/components/DisplayOptionsDialog";
 import { ResetConfirmDialog } from "@/components/ResetConfirmDialog";
 import { CountdownTicker } from "@/components/CountdownTicker";
+import { Button } from "@/components/ui/button";
+import { Sparkles, X } from "lucide-react";
 import {
   EventDialog,
   type EventDialogState,
   type EventDialogResult,
 } from "@/components/EventDialog";
 import { MonthRow } from "@/components/MonthRow";
-import { useEvents } from "@/hooks/useEvents";
+import { useEvents, DEMO_ACTIVE_KEY } from "@/hooks/useEvents";
 import { useDragSelection } from "@/hooks/useDragSelection";
 import {
   useEventDrag,
@@ -80,6 +82,16 @@ export function AnnualCalendar() {
     useState<DisplayOptions>(loadDisplayOptions);
   const [displayOpen, setDisplayOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [demoActive, setDemoActive] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(DEMO_ACTIVE_KEY) === "true",
+  );
+
+  const clearDemoFlag = useCallback(() => {
+    setDemoActive(false);
+    window.localStorage.setItem(DEMO_ACTIVE_KEY, "false");
+  }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<EventDialogState>({
     event: null,
@@ -403,6 +415,40 @@ export function AnnualCalendar() {
       />
 
       <main className="mx-auto max-w-[1800px] px-4 sm:px-6">
+        {/* First-run demo nudge */}
+        {demoActive && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">
+                You're exploring with demo events
+              </p>
+              <p className="text-sm text-muted-foreground">
+                They show what BigPicture can do. Clear them whenever you're
+                ready to plan your own year.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => setConfirmResetOpen(true)}
+              >
+                Clear &amp; start fresh
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Dismiss"
+                onClick={clearDemoFlag}
+              >
+                <X />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Hero */}
         <section className="py-12 sm:py-16">
           <p className="animate-fade-in-up text-sm font-medium uppercase tracking-[0.2em] text-primary opacity-0">
@@ -482,6 +528,7 @@ export function AnnualCalendar() {
         eventCount={events.length}
         onConfirm={() => {
           resetEvents();
+          clearDemoFlag();
           toast.success("Calendar reset", {
             description: "All events were deleted.",
           });

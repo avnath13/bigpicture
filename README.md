@@ -2,7 +2,26 @@
 
 A beautiful, modern **personal annual calendar** — see your entire year at a glance in a horizontal‑row‑per‑month layout. Plan events, drag to create or reschedule, filter by category, and never lose the big picture.
 
+**🔗 Live demo — [thebigpicture.vercel.app](https://thebigpicture.vercel.app)**
+
 > *A year is your canvas.*
+
+## 📸 Screenshots
+
+![BigPicture — annual calendar overview](docs/screenshots/overview-light.png)
+
+<details>
+<summary><b>More views</b> — dark mode &amp; fixed‑week layout</summary>
+
+### Dark mode
+
+![BigPicture in dark mode](docs/screenshots/overview-dark.png)
+
+### Fixed‑week layout with quarter color tones
+
+![Fixed-week layout](docs/screenshots/fixed-week.png)
+
+</details>
 
 ---
 
