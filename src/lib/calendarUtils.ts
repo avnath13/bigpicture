@@ -8,11 +8,9 @@ import {
   differenceInCalendarYears,
   eachDayOfInterval,
   endOfMonth,
-  endOfYear,
   format,
   getDay,
   getISOWeek,
-  isWeekend as dfIsWeekend,
   parseISO,
   startOfMonth,
   startOfToday,
@@ -25,7 +23,6 @@ import type {
   EventCategory,
   EventColor,
   RecurrenceFreq,
-  RecurrenceRule,
   RenderEvent,
   Weekday,
   WeekStart,
@@ -118,10 +115,6 @@ export function getDaysInMonth(monthStart: Date): Date[] {
   });
 }
 
-export function isWeekend(date: Date): boolean {
-  return dfIsWeekend(date);
-}
-
 // ----- display option helpers -----
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
@@ -210,13 +203,6 @@ export function isToday(date: Date): boolean {
 export function isPastEvent(event: { endDate: string }): boolean {
   return differenceInCalendarDays(startOfToday(), fromISO(event.endDate)) > 0;
 }
-
-export const RECURRENCE_LABELS: Record<RecurrenceFreq, string> = {
-  daily: "Daily",
-  weekly: "Weekly",
-  monthly: "Monthly",
-  yearly: "Yearly",
-};
 
 export const RECURRENCE_UNIT: Record<RecurrenceFreq, [string, string]> = {
   daily: ["day", "days"],
@@ -356,30 +342,6 @@ export function expandEventsInRange(
   return result;
 }
 
-export function describeRecurrence(rule: RecurrenceRule): string {
-  const [unit, units] = RECURRENCE_UNIT[rule.freq];
-  const every =
-    rule.interval > 1 ? `Every ${rule.interval} ${units}` : `Every ${unit}`;
-  if (rule.count !== undefined) return `${every}, ${rule.count}×`;
-  if (rule.until) return `${every}, until ${format(fromISO(rule.until), "MMM d, yyyy")}`;
-  return every;
-}
-
-export function clampRangeToYear(
-  startIso: string,
-  endIso: string,
-  year: number,
-): { start: Date; end: Date } | null {
-  const yearStart = startOfYear(new Date(year, 0, 1));
-  const yearEnd = endOfYear(new Date(year, 0, 1));
-  let start = fromISO(startIso);
-  let end = fromISO(endIso);
-  if (end < yearStart || start > yearEnd) return null;
-  if (start < yearStart) start = yearStart;
-  if (end > yearEnd) end = yearEnd;
-  return { start, end };
-}
-
 export interface PositionedEvent {
   event: RenderEvent;
   /** zero-based day index within the month where the bar starts */
@@ -456,17 +418,6 @@ export function layoutMonthEvents(
   // sanity: ensure cols within bounds
   void daysInMonth;
   return { bars, overflow };
-}
-
-export function eventTouchesDay(event: CalendarEvent, day: Date): boolean {
-  const start = fromISO(event.startDate);
-  const end = fromISO(event.endDate);
-  const d = day.getTime();
-  return d >= startOfDayTime(start) && d <= startOfDayTime(end);
-}
-
-function startOfDayTime(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
 export function rangeBetween(a: string, b: string): { start: string; end: string } {
