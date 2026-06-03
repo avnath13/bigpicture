@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
 import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
@@ -11,6 +12,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />
+      <Analytics />
     </BrowserRouter>
   );
 }
