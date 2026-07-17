@@ -116,6 +116,8 @@ export interface DisplayOptions {
   // --- Highlights ---
   /** Weekdays highlighted as days off. */
   daysOff: Weekday[];
+  /** ISO 3166-1 alpha-2 country whose public holidays are marked ("" = off). */
+  holidayCountry: string;
   /** Per-month background accenting. */
   colorTone: ColorTone;
   /** Draw a divider between quarters. */

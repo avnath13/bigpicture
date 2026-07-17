@@ -122,6 +122,7 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   weekStart: 0,
   density: "cozy",
   daysOff: [0, 6],
+  holidayCountry: "",
   colorTone: "none",
   quarterDividers: false,
   showPast: true,

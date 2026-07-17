@@ -9,6 +9,7 @@ import {
   ImageDown,
   Loader2,
   Plus,
+  Printer,
   SlidersHorizontal,
   Upload,
 } from "lucide-react";
@@ -39,6 +40,7 @@ interface CalendarHeaderProps {
   onDownloadBackup: () => void;
   onRestoreBackup: () => void;
   onImportIcs: () => void;
+  onPrint: () => void;
   exporting: boolean;
 }
 
@@ -56,10 +58,11 @@ export function CalendarHeader({
   onDownloadBackup,
   onRestoreBackup,
   onImportIcs,
+  onPrint,
   exporting,
 }: CalendarHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 glass border-b">
+    <header className="sticky top-0 z-40 glass border-b print:hidden">
       <div className="mx-auto flex h-16 max-w-[1800px] items-center gap-3 px-4 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -140,6 +143,10 @@ export function CalendarHeader({
               <DropdownMenuItem onClick={onDownloadBackup}>
                 <FileJson className="mr-2 h-4 w-4" />
                 Download backup (.json)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onPrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print / save as PDF
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onImportIcs}>

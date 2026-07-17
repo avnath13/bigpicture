@@ -32,6 +32,7 @@ A beautiful, modern **personal annual calendar** — see your entire year at a g
 - **Two layouts** — *Date Grid* (continuous day strip) or *Fixed Week* (weekday‑aligned columns, Sunday/Monday start).
 - **Density** — Compact / Cozy / Spacious row heights.
 - **Color tones** — None / Subtle / Quarter / Monthly background accenting.
+- **Public holidays** for 30 countries, marked right on the grid (lazy‑loaded, off by default).
 - **Days off**, **ISO week numbers**, **quarter dividers**, and **past‑date dimming** toggles.
 - **Vertical month labels** in a sticky left rail.
 - **Light & dark themes**, persisted and defaulting to your system preference.
@@ -41,11 +42,13 @@ A beautiful, modern **personal annual calendar** — see your entire year at a g
 - **Drag to move/resize** existing events; live preview while dragging.
 - **9 colors**, **7 categories**, **emoji**, plus **notes, location, and links**.
 - **Recurring events** (daily / weekly / monthly / yearly with interval + end conditions) and **per‑occurrence edits** ("this event" vs "all events").
+- **Hover card** — dwell on any stamp to see its dates, notes, location, and a clickable link.
 - Up to 3 stacked stamps per day with a "+N" overflow; configurable lane position.
 
 ### Productivity & polish
 - **Days‑left countdown** with an animated flip‑digit ticker to keep you motivated.
 - **Search & jump‑to‑date**.
+- **Keyboard shortcuts** — `T` today, `N` new event, `←`/`→` change year, arrow keys + `Enter` on focused day cells.
 - **Category filtering** with tag‑style pills.
 - **Undo** on every delete, restore, and import.
 - **Reset** flow with a clear, guarded confirmation.
@@ -53,6 +56,7 @@ A beautiful, modern **personal annual calendar** — see your entire year at a g
 
 ### Import & export
 - **PNG export** of the whole year grid.
+- **Print / save as PDF** — the grid alone, scaled to one landscape page.
 - **ICS export** — take your events to Google/Apple Calendar (recurrence maps to RRULE).
 - **ICS import** — pull events in from any calendar app (recurring events are skipped for now).
 - **JSON backup & restore** — a one‑click snapshot of your events and display settings, restorable on any device.
@@ -140,10 +144,6 @@ All colors are defined as **HSL CSS variables** (semantic tokens) in `src/index.
 
 Planned, not yet built:
 
-- **Public holidays** (country picker)
-- Event detail hover card (notes, location, link at a glance)
-- Keyboard shortcuts (T, N, ←/→, Esc)
-- Print‑optimized / PDF export
 - Recurring‑event ICS import
 - Multiple calendars/layers · year stats / insights
 - Cloud persistence with user auth (events across devices)

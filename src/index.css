@@ -120,6 +120,10 @@
     @apply bg-calendar-weekend;
   }
 
+  .calendar-cell-holiday {
+    background-color: hsl(var(--event-coral) / 0.12);
+  }
+
   .calendar-cell-today {
     @apply ring-2 ring-inset ring-primary bg-primary/5;
   }
@@ -195,5 +199,36 @@
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+}
+
+/* Print / save-as-PDF: just the year grid, landscape, with real colors.
+   The grid is scaled to the page via an inline `zoom` set right before
+   window.print() (see handlePrint in AnnualCalendar). */
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-grid {
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .animate-fade-in-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .today-pulse::after {
+    animation: none !important;
   }
 }

@@ -3,6 +3,7 @@ import {
   AlignJustify,
   AlignLeft,
   Clock,
+  Globe,
   Hash,
   Layers,
   Leaf,
@@ -24,9 +25,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { WEEKDAYS } from "@/lib/calendarUtils";
+import { HOLIDAY_COUNTRIES } from "@/hooks/useHolidays";
 import type {
   ColorTone,
   Density,
@@ -164,6 +173,37 @@ export function DisplayOptionsDialog({
                 );
               })}
             </div>
+          </Row>
+
+          <Divider />
+
+          <Row
+            icon={<Globe />}
+            title="Public holidays"
+            desc={
+              options.holidayCountry
+                ? "Holidays are marked on the grid"
+                : "Pick a country to mark its public holidays"
+            }
+          >
+            <Select
+              value={options.holidayCountry || "none"}
+              onValueChange={(v) =>
+                set("holidayCountry", v === "none" ? "" : v)
+              }
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Off</SelectItem>
+                {HOLIDAY_COUNTRIES.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Row>
 
           <Divider />

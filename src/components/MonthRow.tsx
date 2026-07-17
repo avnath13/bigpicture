@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { format, getDay } from "date-fns";
+import { addDays, addMonths, format, getDay } from "date-fns";
 import { Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DisplayOptions, RenderEvent } from "@/lib/types";
@@ -15,6 +15,13 @@ import {
   toISO,
   toneForMonth,
 } from "@/lib/calendarUtils";
+
+/** Move keyboard focus to another day cell, if it exists in the grid. */
+function focusCell(date: Date) {
+  document
+    .querySelector<HTMLElement>(`[data-date="${toISO(date)}"]`)
+    ?.focus();
+}
 
 /** Fallback cell width before the container has been measured. */
 export const CELL_WIDTH = 44;
@@ -35,12 +42,18 @@ interface MonthRowProps {
   cellWidth: number;
   totalColumns: number;
   todayIso: string;
+  /** The one cell that participates in the tab order (roving tabindex). */
+  focusIso: string;
+  /** ISO date → public holiday name. */
+  holidays: Record<string, string>;
   onDayClick: (iso: string) => void;
   onBarPointerDown: (
     e: React.MouseEvent,
     event: RenderEvent,
     kind: "move" | "resize-start" | "resize-end",
   ) => void;
+  onBarHover: (event: RenderEvent, element: HTMLElement) => void;
+  onBarHoverEnd: () => void;
   startDrag: (iso: string) => void;
   extendDrag: (iso: string) => void;
   isInRange: (iso: string) => boolean;
@@ -55,8 +68,12 @@ export function MonthRow({
   cellWidth,
   totalColumns,
   todayIso,
+  focusIso,
+  holidays,
   onDayClick,
   onBarPointerDown,
+  onBarHover,
+  onBarHoverEnd,
   startDrag,
   extendDrag,
   isInRange,
@@ -135,6 +152,7 @@ export function MonthRow({
           const iso = toISO(day);
           const col = day.getDate() - 1;
           const dayOff = isDayOff(day, options.daysOff);
+          const holiday = holidays[iso];
           const today = isToday(day);
           const inRange = isInRange(iso);
           const isPast = options.showPast && iso < todayIso;
@@ -144,12 +162,19 @@ export function MonthRow({
               key={iso}
               data-date={iso}
               role="button"
-              tabIndex={-1}
-              aria-label={format(day, "EEEE, MMMM d")}
+              tabIndex={iso === focusIso ? 0 : -1}
+              title={holiday}
+              aria-label={
+                holiday
+                  ? `${format(day, "EEEE, MMMM d")} — ${holiday}`
+                  : format(day, "EEEE, MMMM d")
+              }
               className={cn(
                 "calendar-cell absolute top-0 cursor-pointer hover:bg-accent/40",
+                "outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 laneTop ? "justify-end pb-1" : "justify-start pt-1",
                 dayOff && "calendar-cell-weekend",
+                holiday && "calendar-cell-holiday",
                 today && "calendar-cell-today today-pulse",
                 inRange && "z-10 bg-primary/20 ring-1 ring-inset ring-primary",
               )}
@@ -162,11 +187,36 @@ export function MonthRow({
                 if (isDragging) extendDrag(iso);
               }}
               onClick={() => onDayClick(iso)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onDayClick(iso);
+                } else if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  focusCell(addDays(day, -1));
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  focusCell(addDays(day, 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  focusCell(addMonths(day, -1));
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  focusCell(addMonths(day, 1));
+                }
+              }}
             >
               {options.showWeekNumbers && isMonday && (
                 <span className="absolute left-0.5 top-0.5 rounded-sm bg-muted px-1 text-[8px] font-medium leading-tight text-muted-foreground/80">
                   {isoWeek(day)}
                 </span>
+              )}
+              {holiday && (
+                <span
+                  aria-hidden
+                  className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: "hsl(var(--event-coral))" }}
+                />
               )}
               <span
                 className={cn(
@@ -200,7 +250,6 @@ export function MonthRow({
             <button
               key={event.id}
               type="button"
-              title={event.title}
               className={cn(
                 "event-bar",
                 !colored && "text-foreground ring-1 ring-border",
@@ -220,6 +269,8 @@ export function MonthRow({
                 e.stopPropagation();
                 onBarPointerDown(e, event, "move");
               }}
+              onMouseEnter={(e) => onBarHover(event, e.currentTarget)}
+              onMouseLeave={onBarHoverEnd}
             >
               <span
                 aria-hidden

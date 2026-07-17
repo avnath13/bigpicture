@@ -19,7 +19,12 @@ import {
   type EventDialogResult,
 } from "@/components/EventDialog";
 import { MonthRow } from "@/components/MonthRow";
+import {
+  EventHoverCard,
+  type HoverAnchor,
+} from "@/components/EventHoverCard";
 import { useEvents, DEMO_ACTIVE_KEY } from "@/hooks/useEvents";
+import { useHolidays } from "@/hooks/useHolidays";
 import { useDragSelection } from "@/hooks/useDragSelection";
 import {
   useEventDrag,
@@ -197,6 +202,43 @@ export function AnnualCalendar() {
     onComplete: (range) => openCreate(range),
   });
 
+  // ----- event hover card (show after a short dwell, keep open over the card) -----
+  const [hoverAnchor, setHoverAnchor] = useState<HoverAnchor | null>(null);
+  const hoverShowTimer = useRef<number>();
+  const hoverHideTimer = useRef<number>();
+
+  const cancelHoverTimers = useCallback(() => {
+    window.clearTimeout(hoverShowTimer.current);
+    window.clearTimeout(hoverHideTimer.current);
+  }, []);
+
+  const handleBarHover = useCallback(
+    (occ: RenderEvent, element: HTMLElement) => {
+      cancelHoverTimers();
+      const rect = element.getBoundingClientRect();
+      hoverShowTimer.current = window.setTimeout(() => {
+        setHoverAnchor({
+          occ,
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      }, 350);
+    },
+    [cancelHoverTimers],
+  );
+
+  const handleBarHoverEnd = useCallback(() => {
+    cancelHoverTimers();
+    hoverHideTimer.current = window.setTimeout(() => setHoverAnchor(null), 150);
+  }, [cancelHoverTimers]);
+
+  const dismissHoverCard = useCallback(() => {
+    cancelHoverTimers();
+    setHoverAnchor(null);
+  }, [cancelHoverTimers]);
+
   // ----- commit dialog results with toasts -----
   const upsertException = useCallback(
     (masterId: string, originalDate: string, patch: EventException) => {
@@ -289,6 +331,13 @@ export function AnnualCalendar() {
     onClickEvent: handleOccurrenceClick,
   });
 
+  // Any drag or dialog supersedes the hover card.
+  useEffect(() => {
+    if (drag.isDragging || eventDrag.isDragging || dialogOpen) {
+      dismissHoverCard();
+    }
+  }, [drag.isDragging, eventDrag.isDragging, dialogOpen, dismissHoverCard]);
+
   const handleBarPointerDown = useCallback(
     (e: React.MouseEvent, occ: RenderEvent, kind: DragKind) => {
       const grabIso = dateUnderPoint(e.clientX, e.clientY) ?? occ.startDate;
@@ -297,37 +346,28 @@ export function AnnualCalendar() {
     [eventDrag],
   );
 
-  // Expand events for the year, applying a live preview while dragging an event.
-  const renderEvents = useMemo(() => {
-    const preview = eventDrag.preview;
-    const source = preview
-      ? events.map((e) => {
-          if (e.id !== preview.occ.masterId) return e;
-          const dates = computeDragDates(preview.occ, preview.kind, preview.deltaDays);
-          if (e.recurrence) {
-            return {
-              ...e,
-              exceptions: {
-                ...e.exceptions,
-                [preview.occ.originalDate]: {
-                  ...e.exceptions?.[preview.occ.originalDate],
-                  startDate: dates.start,
-                  endDate: dates.end,
-                },
-              },
-            };
-          }
-          return { ...e, startDate: dates.start, endDate: dates.end };
-        })
-      : events;
-
+  // Expand events once per data change — NOT per drag step. Filter AFTER
+  // expansion so per-occurrence category overrides are honored.
+  const baseRenderEvents = useMemo(() => {
     const rangeStart = startOfYear(new Date(year, 0, 1));
     const rangeEnd = endOfYear(new Date(year, 0, 1));
-    // Filter AFTER expansion so per-occurrence category overrides are honored.
-    return expandEventsInRange(source, rangeStart, rangeEnd).filter((e) =>
+    return expandEventsInRange(events, rangeStart, rangeEnd).filter((e) =>
       activeCategories.has(e.category),
     );
-  }, [events, activeCategories, year, eventDrag.preview]);
+  }, [events, activeCategories, year]);
+
+  // While dragging, patch only the dragged occurrence instead of re-expanding
+  // the whole year on every cell the pointer crosses.
+  const renderEvents = useMemo(() => {
+    const preview = eventDrag.preview;
+    if (!preview) return baseRenderEvents;
+    const dates = computeDragDates(preview.occ, preview.kind, preview.deltaDays);
+    return baseRenderEvents.map((occ) =>
+      occ.id === preview.occ.id
+        ? { ...occ, startDate: dates.start, endDate: dates.end }
+        : occ,
+    );
+  }, [baseRenderEvents, eventDrag.preview]);
 
   const toggleCategory = useCallback((category: EventCategory) => {
     setActiveCategories((prev) => {
@@ -361,6 +401,68 @@ export function AnnualCalendar() {
     if (year !== currentYear) setYear(currentYear);
     scrollToDate(toISO(new Date()));
   }, [year, currentYear, scrollToDate]);
+
+  // ----- keyboard shortcuts: T today, N new event, ←/→ change year -----
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const target = e.target as HTMLElement;
+      // Never steal keys from form fields, dialogs, or menus.
+      if (
+        target.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]',
+        )
+      ) {
+        return;
+      }
+      if (dialogOpen || displayOpen || confirmResetOpen) return;
+      // Arrow keys on a focused day cell navigate the grid, not the year.
+      const onCell = target.closest("[data-date]") !== null;
+      switch (e.key) {
+        case "t":
+        case "T":
+          e.preventDefault();
+          handleToday();
+          break;
+        case "n":
+        case "N":
+          e.preventDefault();
+          openCreate(null);
+          break;
+        case "ArrowLeft":
+          if (!onCell) {
+            e.preventDefault();
+            setYear((y) => y - 1);
+          }
+          break;
+        case "ArrowRight":
+          if (!onCell) {
+            e.preventDefault();
+            setYear((y) => y + 1);
+          }
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [dialogOpen, displayOpen, confirmResetOpen, handleToday, openCreate]);
+
+  // Public holidays for the selected country (lazy-loaded).
+  const holidays = useHolidays(displayOptions.holidayCountry, year);
+
+  // Roving tabindex entry point: today when visible, else Jan 1.
+  const focusIso = year === currentYear ? todayIso : `${year}-01-01`;
+
+  // Print the year grid, scaled to fit one landscape page.
+  const handlePrint = useCallback(() => {
+    const node = gridRef.current;
+    if (!node) return;
+    // ~A4 landscape printable width at 96dpi, minus margins.
+    const zoom = Math.min(1, 1060 / node.scrollWidth);
+    node.style.setProperty("zoom", String(zoom));
+    window.print();
+    node.style.removeProperty("zoom");
+  }, []);
 
   // Export the full year grid as a PNG.
   const handleExport = useCallback(async () => {
@@ -556,6 +658,7 @@ export function AnnualCalendar() {
         onDownloadBackup={handleDownloadBackup}
         onRestoreBackup={() => backupInputRef.current?.click()}
         onImportIcs={() => icsInputRef.current?.click()}
+        onPrint={handlePrint}
         exporting={exporting}
       />
 
@@ -578,7 +681,7 @@ export function AnnualCalendar() {
       <main className="mx-auto max-w-[1800px] px-4 sm:px-6">
         {/* First-run demo nudge */}
         {demoActive && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 print:hidden">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Sparkles className="h-4 w-4" />
             </span>
@@ -611,7 +714,7 @@ export function AnnualCalendar() {
         )}
 
         {/* Hero */}
-        <section className="py-12 sm:py-16">
+        <section className="py-12 sm:py-16 print:hidden">
           <p className="animate-fade-in-up text-sm font-medium uppercase tracking-[0.2em] text-primary opacity-0">
             {year}
           </p>
@@ -627,14 +730,19 @@ export function AnnualCalendar() {
         <YearProgress year={year} currentYear={currentYear} />
 
         {/* Category filter — sits directly above the calendar */}
-        <div className="mb-3 overflow-x-auto pb-1">
+        <div className="mb-3 overflow-x-auto pb-1 print:hidden">
           <CategoryFilter active={activeCategories} onToggle={toggleCategory} />
         </div>
+
+        {/* Print-only title */}
+        <h1 className="hidden font-display text-2xl font-bold text-foreground print:block print:mb-3">
+          {year}
+        </h1>
 
         {/* Calendar grid */}
         <div
           ref={scrollRef}
-          className="no-scrollbar overflow-x-auto rounded-2xl border border-border bg-card/50 shadow-sm"
+          className="print-grid no-scrollbar overflow-x-auto rounded-2xl border border-border bg-card/50 shadow-sm"
         >
           <div
             ref={gridRef}
@@ -650,8 +758,12 @@ export function AnnualCalendar() {
                 cellWidth={cellWidth}
                 totalColumns={totalColumns}
                 todayIso={todayIso}
+                focusIso={focusIso}
+                holidays={holidays}
                 onDayClick={(iso) => openCreate({ start: iso, end: iso })}
                 onBarPointerDown={handleBarPointerDown}
+                onBarHover={handleBarHover}
+                onBarHoverEnd={handleBarHoverEnd}
                 startDrag={drag.startDrag}
                 extendDrag={drag.extendDrag}
                 isInRange={drag.isInRange}
@@ -662,8 +774,19 @@ export function AnnualCalendar() {
         </div>
 
         {/* Legend */}
-        <Legend colors={usedColors} />
+        <Legend
+          colors={usedColors}
+          showHoliday={displayOptions.holidayCountry !== ""}
+        />
       </main>
+
+      {hoverAnchor && (
+        <EventHoverCard
+          anchor={hoverAnchor}
+          onMouseEnter={cancelHoverTimers}
+          onMouseLeave={handleBarHoverEnd}
+        />
+      )}
 
       <EventDialog
         open={dialogOpen}
@@ -699,12 +822,26 @@ export function AnnualCalendar() {
   );
 }
 
-function Legend({ colors }: { colors: EventColor[] }) {
+function Legend({
+  colors,
+  showHoliday,
+}: {
+  colors: EventColor[];
+  showHoliday: boolean;
+}) {
   return (
-    <footer className="flex flex-wrap items-center gap-x-6 gap-y-3 py-8 text-xs text-muted-foreground">
+    <footer className="flex flex-wrap items-center gap-x-6 gap-y-3 py-8 text-xs text-muted-foreground print:hidden">
       <LegendItem label="Day off">
         <span className="h-3.5 w-3.5 rounded border border-border bg-calendar-weekend" />
       </LegendItem>
+      {showHoliday && (
+        <LegendItem label="Public holiday">
+          <span
+            className="h-3.5 w-3.5 rounded border border-border"
+            style={{ backgroundColor: "hsl(var(--event-coral) / 0.25)" }}
+          />
+        </LegendItem>
+      )}
       <LegendItem label="Today">
         <span className="h-3.5 w-3.5 rounded bg-primary/10 ring-2 ring-inset ring-primary" />
       </LegendItem>
@@ -772,7 +909,7 @@ function YearProgress({
   }
 
   return (
-    <div className="mb-6 animate-fade-in-up rounded-2xl border border-border bg-card/50 p-4 opacity-0 shadow-sm sm:p-5">
+    <div className="mb-6 animate-fade-in-up rounded-2xl border border-border bg-card/50 p-4 opacity-0 shadow-sm sm:p-5 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="font-display text-base font-semibold text-foreground">
