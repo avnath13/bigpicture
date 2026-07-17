@@ -47,6 +47,9 @@ import {
   toISO,
 } from "@/lib/calendarUtils";
 import { storageGet, storageSet } from "@/lib/storage";
+import { downloadTextFile } from "@/lib/download";
+import { eventsToICS, parseICS } from "@/lib/ics";
+import { buildBackup, parseBackup } from "@/lib/persistence";
 
 interface ScrollTarget {
   monthIndex: number;
@@ -71,8 +74,15 @@ function loadDisplayOptions(): DisplayOptions {
 
 export function AnnualCalendar() {
   const currentYear = new Date().getFullYear();
-  const { events, addEvent, updateEvent, deleteEvent, resetEvents } =
-    useEvents();
+  const {
+    events,
+    addEvent,
+    addEvents,
+    updateEvent,
+    deleteEvent,
+    replaceEvents,
+    resetEvents,
+  } = useEvents();
 
   const [year, setYear] = useState(currentYear);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
@@ -387,6 +397,108 @@ export function AnnualCalendar() {
     }
   }, [year, exporting]);
 
+  // ----- backup / ICS import & export -----
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const icsInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportIcs = useCallback(() => {
+    if (events.length === 0) {
+      toast.info("Nothing to export yet");
+      return;
+    }
+    downloadTextFile(
+      "bigpicture-events.ics",
+      "text/calendar",
+      eventsToICS(events, new Date()),
+    );
+    toast.success("Calendar exported", {
+      description: "bigpicture-events.ics",
+    });
+  }, [events]);
+
+  const handleDownloadBackup = useCallback(() => {
+    const filename = `bigpicture-backup-${toISO(new Date())}.json`;
+    downloadTextFile(
+      filename,
+      "application/json",
+      buildBackup(events, displayOptions, new Date()),
+    );
+    toast.success("Backup downloaded", { description: filename });
+  }, [events, displayOptions]);
+
+  const handleRestoreFile = useCallback(
+    async (file: File) => {
+      const backup = parseBackup(await file.text());
+      if (!backup) {
+        toast.error("Couldn't read that backup", {
+          description: "The file doesn't look like a BigPicture backup.",
+        });
+        return;
+      }
+      const prevEvents = events;
+      const prevDisplay = displayOptions;
+      replaceEvents(backup.events);
+      if (backup.display) setDisplayOptions(backup.display);
+      clearDemoFlag();
+      toast.success("Backup restored", {
+        description: `${backup.events.length} ${
+          backup.events.length === 1 ? "event" : "events"
+        } loaded.`,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            replaceEvents(prevEvents);
+            setDisplayOptions(prevDisplay);
+          },
+        },
+      });
+    },
+    [events, displayOptions, replaceEvents, clearDemoFlag],
+  );
+
+  const handleImportIcsFile = useCallback(
+    async (file: File) => {
+      const { events: imported, skippedRecurring } = parseICS(
+        await file.text(),
+      );
+      if (imported.length === 0) {
+        toast.error("No events imported", {
+          description: skippedRecurring
+            ? `${skippedRecurring} recurring events were skipped — recurring import isn't supported yet.`
+            : "No readable events were found in that file.",
+        });
+        return;
+      }
+      const prevEvents = events;
+      addEvents(imported);
+      toast.success(
+        `Imported ${imported.length} ${imported.length === 1 ? "event" : "events"}`,
+        {
+          description: skippedRecurring
+            ? `${skippedRecurring} recurring ${
+                skippedRecurring === 1 ? "event" : "events"
+              } skipped.`
+            : undefined,
+          action: {
+            label: "Undo",
+            onClick: () => replaceEvents(prevEvents),
+          },
+        },
+      );
+    },
+    [events, addEvents, replaceEvents],
+  );
+
+  const handleFileChange = useCallback(
+    (handler: (file: File) => Promise<void>) =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (file) void handler(file);
+      },
+    [],
+  );
+
   // Perform queued scroll after render (also after a year change).
   useEffect(() => {
     if (!scrollTarget) return;
@@ -440,7 +552,27 @@ export function AnnualCalendar() {
         onOpenDisplayOptions={() => setDisplayOpen(true)}
         onJump={handleJump}
         onExport={handleExport}
+        onExportIcs={handleExportIcs}
+        onDownloadBackup={handleDownloadBackup}
+        onRestoreBackup={() => backupInputRef.current?.click()}
+        onImportIcs={() => icsInputRef.current?.click()}
         exporting={exporting}
+      />
+
+      {/* Hidden pickers for the header's import menu items. */}
+      <input
+        ref={backupInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleFileChange(handleRestoreFile)}
+      />
+      <input
+        ref={icsInputRef}
+        type="file"
+        accept=".ics,text/calendar"
+        className="hidden"
+        onChange={handleFileChange(handleImportIcsFile)}
       />
 
       <main className="mx-auto max-w-[1800px] px-4 sm:px-6">

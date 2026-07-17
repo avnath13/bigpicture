@@ -47,9 +47,15 @@ A beautiful, modern **personal annual calendar** — see your entire year at a g
 - **Days‑left countdown** with an animated flip‑digit ticker to keep you motivated.
 - **Search & jump‑to‑date**.
 - **Category filtering** with tag‑style pills.
-- **PNG export** of the whole year grid.
+- **Undo** on every delete, restore, and import.
 - **Reset** flow with a clear, guarded confirmation.
-- Toast confirmations on every action; everything persists to **localStorage**.
+- Toast confirmations on every action; everything persists to **localStorage** (schema‑versioned, with validation and migration on load).
+
+### Import & export
+- **PNG export** of the whole year grid.
+- **ICS export** — take your events to Google/Apple Calendar (recurrence maps to RRULE).
+- **ICS import** — pull events in from any calendar app (recurring events are skipped for now).
+- **JSON backup & restore** — a one‑click snapshot of your events and display settings, restorable on any device.
 
 ---
 
@@ -62,6 +68,7 @@ A beautiful, modern **personal annual calendar** — see your entire year at a g
 - **framer-motion** for the countdown ticker
 - **sonner** for toasts · **react-helmet-async** for SEO · **react-router-dom**
 - **html-to-image** for PNG export
+- **Vitest** for the recurrence, persistence, and ICS test suites
 
 ---
 
@@ -76,6 +83,9 @@ npm run dev
 
 # type-check and build for production
 npm run build
+
+# run the test suite
+npm test
 
 # preview the production build
 npm run preview
@@ -106,11 +116,17 @@ src/
     useEventDrag.ts         # drag-to-move / resize existing events
   lib/
     calendarUtils.ts        # date helpers, recurrence expansion, layout
+    persistence.ts          # versioned storage, validation, JSON backups
+    ics.ts                  # iCalendar (.ics) export & import
+    storage.ts              # throw-safe localStorage wrappers
+    download.ts             # client-side file downloads
     types.ts                # CalendarEvent, DisplayOptions, etc.
     sampleEvents.ts         # seed data
   pages/
     Index.tsx, NotFound.tsx
 ```
+
+Unit tests live next to the code they cover (`src/lib/*.test.ts`) and run with `npm test`.
 
 ---
 
@@ -124,8 +140,10 @@ All colors are defined as **HSL CSS variables** (semantic tokens) in `src/index.
 
 Planned, not yet built:
 
-- Public holidays + **ICS import/export**
-- Print‑optimized / PDF export
-- Cloud persistence with user auth (events across devices)
+- **Public holidays** (country picker)
+- Event detail hover card (notes, location, link at a glance)
 - Keyboard shortcuts (T, N, ←/→, Esc)
-- Year stats / insights, multiple calendars/layers, JSON backup & restore
+- Print‑optimized / PDF export
+- Recurring‑event ICS import
+- Multiple calendars/layers · year stats / insights
+- Cloud persistence with user auth (events across devices)

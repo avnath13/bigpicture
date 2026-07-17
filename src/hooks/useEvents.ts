@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
 import { buildSampleEvents } from "@/lib/sampleEvents";
+import { deserializeEvents, serializeEvents } from "@/lib/persistence";
 import { storageGet, storageSet } from "@/lib/storage";
 
 const STORAGE_KEY = "bigpicture.events";
@@ -10,15 +11,11 @@ export const DEMO_ACTIVE_KEY = "bigpicture.demoActive";
 function loadEvents(): CalendarEvent[] {
   const raw = storageGet(STORAGE_KEY);
   if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as CalendarEvent[];
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      // fall through to seed
-    }
+    const events = deserializeEvents(raw);
+    if (events) return events;
   }
   const seed = buildSampleEvents(new Date().getFullYear());
-  storageSet(STORAGE_KEY, JSON.stringify(seed));
+  storageSet(STORAGE_KEY, serializeEvents(seed));
   storageSet(DEMO_ACTIVE_KEY, "true");
   return seed;
 }
@@ -27,7 +24,7 @@ export function useEvents() {
   const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
 
   useEffect(() => {
-    storageSet(STORAGE_KEY, JSON.stringify(events));
+    storageSet(STORAGE_KEY, serializeEvents(events));
   }, [events]);
 
   const addEvent = useCallback((event: CalendarEvent) => {
@@ -42,10 +39,28 @@ export function useEvents() {
     setEvents((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
+  /** Append a batch of events (e.g. an .ics import). */
+  const addEvents = useCallback((batch: CalendarEvent[]) => {
+    setEvents((prev) => [...prev, ...batch]);
+  }, []);
+
+  /** Replace the whole store (e.g. restoring a backup). */
+  const replaceEvents = useCallback((next: CalendarEvent[]) => {
+    setEvents(next);
+  }, []);
+
   /** Wipe every event and start from an empty calendar. */
   const resetEvents = useCallback(() => {
     setEvents([]);
   }, []);
 
-  return { events, addEvent, updateEvent, deleteEvent, resetEvents };
+  return {
+    events,
+    addEvent,
+    addEvents,
+    updateEvent,
+    deleteEvent,
+    replaceEvents,
+    resetEvents,
+  };
 }

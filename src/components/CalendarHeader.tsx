@@ -2,12 +2,24 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Download,
+  FileDown,
+  FileJson,
+  FileUp,
   ImageDown,
   Loader2,
   Plus,
   SlidersHorizontal,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { JumpToDate } from "@/components/JumpToDate";
@@ -23,6 +35,10 @@ interface CalendarHeaderProps {
   onOpenDisplayOptions: () => void;
   onJump: (iso: string) => void;
   onExport: () => void;
+  onExportIcs: () => void;
+  onDownloadBackup: () => void;
+  onRestoreBackup: () => void;
+  onImportIcs: () => void;
   exporting: boolean;
 }
 
@@ -36,6 +52,10 @@ export function CalendarHeader({
   onOpenDisplayOptions,
   onJump,
   onExport,
+  onExportIcs,
+  onDownloadBackup,
+  onRestoreBackup,
+  onImportIcs,
   exporting,
 }: CalendarHeaderProps) {
   return (
@@ -97,15 +117,41 @@ export function CalendarHeader({
 
           <JumpToDate events={events} onJump={onJump} />
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onExport}
-            disabled={exporting}
-            aria-label="Export year as image"
-          >
-            {exporting ? <Loader2 className="animate-spin" /> : <ImageDown />}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={exporting}
+                aria-label="Import and export"
+              >
+                {exporting ? <Loader2 className="animate-spin" /> : <Download />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onExport}>
+                <ImageDown className="mr-2 h-4 w-4" />
+                Export image (PNG)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onExportIcs}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export calendar (.ics)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDownloadBackup}>
+                <FileJson className="mr-2 h-4 w-4" />
+                Download backup (.json)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onImportIcs}>
+                <FileUp className="mr-2 h-4 w-4" />
+                Import events (.ics)…
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onRestoreBackup}>
+                <Upload className="mr-2 h-4 w-4" />
+                Restore backup…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
