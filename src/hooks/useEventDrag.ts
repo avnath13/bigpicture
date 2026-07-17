@@ -55,7 +55,7 @@ interface UseEventDragOptions {
 }
 
 /** Swallow the synthetic click that fires right after a mouse drag ends. */
-function swallowNextClick() {
+export function swallowNextClick() {
   const handler = (e: MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();

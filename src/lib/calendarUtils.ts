@@ -257,6 +257,49 @@ function lowerBoundIndex(
 const MAX_OCCURRENCES = 2000;
 
 /**
+ * Drop exception entries whose keys no longer match any occurrence of the
+ * event's (possibly just-edited) recurrence rule. Without this, changing a
+ * series' frequency/interval/end leaves dead overrides keyed by dates that
+ * will never be generated again.
+ */
+export function pruneOrphanedExceptions(event: CalendarEvent): CalendarEvent {
+  const keys = event.exceptions ? Object.keys(event.exceptions) : [];
+  if (keys.length === 0) return event;
+  // No recurrence → exceptions are meaningless; drop them all.
+  if (!event.recurrence) {
+    const { exceptions: _drop, ...rest } = event;
+    return rest;
+  }
+
+  const { freq, interval: rawInterval, until, count } = event.recurrence;
+  const interval = Math.max(1, rawInterval);
+  const untilDate = until ? fromISO(until) : null;
+  const start = fromISO(event.startDate);
+  // Only need occurrence dates up to the latest exception key.
+  const maxKeyDate = fromISO(keys.reduce((a, b) => (a > b ? a : b)));
+
+  const valid = new Set<string>();
+  for (let n = 0; n < MAX_OCCURRENCES; n++) {
+    if (count !== undefined && n >= count) break;
+    const occStart = occurrenceStart(start, freq, interval, n);
+    if (untilDate && occStart > untilDate) break;
+    if (occStart > maxKeyDate) break;
+    valid.add(toISO(occStart));
+  }
+
+  const kept = keys.filter((k) => valid.has(k));
+  if (kept.length === keys.length) return event;
+  if (kept.length === 0) {
+    const { exceptions: _drop, ...rest } = event;
+    return rest;
+  }
+  return {
+    ...event,
+    exceptions: Object.fromEntries(kept.map((k) => [k, event.exceptions![k]])),
+  };
+}
+
+/**
  * Expand events into concrete occurrences overlapping [rangeStart, rangeEnd].
  * Non-recurring events yield a single occurrence (when they overlap); recurring
  * events yield one occurrence per matching cycle, each preserving the duration.

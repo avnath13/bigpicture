@@ -38,7 +38,9 @@ import {
   RECURRENCE_UNIT,
   createId,
   eventColorValue,
+  pruneOrphanedExceptions,
   rangeBetween,
+  toISO,
 } from "@/lib/calendarUtils";
 
 export interface EventDialogState {
@@ -90,7 +92,8 @@ interface FormState {
   count: number;
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+// Local-time "today" — must match the grid's today highlight (not UTC).
+const todayIso = () => toISO(new Date());
 
 function deriveInitial(state: EventDialogState): FormState {
   const recurrence = state.event?.recurrence;
@@ -228,7 +231,7 @@ export function EventDialog({
       // Apply non-schedule fields to the whole series; keep the original schedule.
       onResult({
         type: "save-all",
-        event: {
+        event: pruneOrphanedExceptions({
           ...state.event,
           title,
           category: form.category,
@@ -238,7 +241,7 @@ export function EventDialog({
           url,
           notes,
           recurrence: buildRecurrence(),
-        },
+        }),
       });
       onOpenChange(false);
       return;

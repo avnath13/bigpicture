@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { rangeBetween } from "@/lib/calendarUtils";
+import { swallowNextClick } from "@/hooks/useEventDrag";
 
 interface DragState {
   anchor: string;
@@ -64,6 +65,9 @@ export function useDragSelection({ onComplete }: UseDragSelectionOptions) {
       movedRef.current = false;
       setDrag(null);
       if (current && moved) {
+        // A drag that ends on its anchor cell would also fire that cell's
+        // click handler and re-open the dialog — eat the trailing click.
+        swallowNextClick();
         onComplete(rangeBetween(current.anchor, current.focus));
       }
     };

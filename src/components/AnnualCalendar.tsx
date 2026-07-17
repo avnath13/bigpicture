@@ -46,6 +46,7 @@ import {
   leadingOffset,
   toISO,
 } from "@/lib/calendarUtils";
+import { storageGet, storageSet } from "@/lib/storage";
 
 interface ScrollTarget {
   monthIndex: number;
@@ -59,9 +60,8 @@ const MIN_CELL = 30;
 const MAX_CELL = 72;
 
 function loadDisplayOptions(): DisplayOptions {
-  if (typeof window === "undefined") return DEFAULT_DISPLAY_OPTIONS;
   try {
-    const raw = window.localStorage.getItem(DISPLAY_KEY);
+    const raw = storageGet(DISPLAY_KEY);
     if (raw) return { ...DEFAULT_DISPLAY_OPTIONS, ...JSON.parse(raw) };
   } catch {
     // ignore
@@ -83,14 +83,12 @@ export function AnnualCalendar() {
   const [displayOpen, setDisplayOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [demoActive, setDemoActive] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(DEMO_ACTIVE_KEY) === "true",
+    () => storageGet(DEMO_ACTIVE_KEY) === "true",
   );
 
   const clearDemoFlag = useCallback(() => {
     setDemoActive(false);
-    window.localStorage.setItem(DEMO_ACTIVE_KEY, "false");
+    storageSet(DEMO_ACTIVE_KEY, "false");
   }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<EventDialogState>({
@@ -107,6 +105,26 @@ export function AnnualCalendar() {
 
   const months = useMemo(() => getMonthsForYear(year), [year]);
 
+  // Roll "today" over at local midnight so a long-lived tab stays accurate.
+  const [todayIso, setTodayIso] = useState(() => toISO(new Date()));
+  useEffect(() => {
+    let timer: number;
+    const schedule = () => {
+      const now = new Date();
+      const nextMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+      );
+      timer = window.setTimeout(() => {
+        setTodayIso(toISO(new Date()));
+        schedule();
+      }, nextMidnight.getTime() - now.getTime() + 1000);
+    };
+    schedule();
+    return () => window.clearTimeout(timer);
+  }, []);
+
   // Distinct event colors actually in use (stable palette order), for the legend.
   const usedColors = useMemo(
     () => EVENT_COLORS.filter((c) => events.some((e) => e.color === c)),
@@ -115,7 +133,7 @@ export function AnnualCalendar() {
 
   // Persist display options.
   useEffect(() => {
-    window.localStorage.setItem(DISPLAY_KEY, JSON.stringify(displayOptions));
+    storageSet(DISPLAY_KEY, JSON.stringify(displayOptions));
   }, [displayOptions]);
 
   // Track the calendar's available width so cells can fill the screen.
@@ -209,14 +227,24 @@ export function AnnualCalendar() {
         case "delete-all": {
           const removed = events.find((e) => e.id === result.id);
           deleteEvent(result.id);
-          toast.success("Event deleted", { description: removed?.title });
+          toast.success("Event deleted", {
+            description: removed?.title,
+            action: removed
+              ? { label: "Undo", onClick: () => addEvent(removed) }
+              : undefined,
+          });
           break;
         }
         case "delete-this": {
+          const master = events.find((e) => e.id === result.masterId);
           upsertException(result.masterId, result.originalDate, {
             deleted: true,
           });
-          toast.success("This occurrence deleted");
+          toast.success("This occurrence deleted", {
+            action: master
+              ? { label: "Undo", onClick: () => updateEvent(master) }
+              : undefined,
+          });
           break;
         }
       }
@@ -283,10 +311,12 @@ export function AnnualCalendar() {
         })
       : events;
 
-    const filtered = source.filter((e) => activeCategories.has(e.category));
     const rangeStart = startOfYear(new Date(year, 0, 1));
     const rangeEnd = endOfYear(new Date(year, 0, 1));
-    return expandEventsInRange(filtered, rangeStart, rangeEnd);
+    // Filter AFTER expansion so per-occurrence category overrides are honored.
+    return expandEventsInRange(source, rangeStart, rangeEnd).filter((e) =>
+      activeCategories.has(e.category),
+    );
   }, [events, activeCategories, year, eventDrag.preview]);
 
   const toggleCategory = useCallback((category: EventCategory) => {
@@ -390,7 +420,6 @@ export function AnnualCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const todayIso = toISO(new Date());
   const daysLeft = differenceInCalendarDays(endOfYear(new Date()), new Date());
   const subtitle =
     year === currentYear
@@ -589,7 +618,11 @@ function YearProgress({
   if (year === currentYear) {
     const elapsed = differenceInCalendarDays(now, yearStart);
     const daysLeft = differenceInCalendarDays(yearEnd, now);
-    percent = Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
+    // On Dec 31 the year is effectively done — show 100%, not 364/365.
+    percent =
+      daysLeft <= 0
+        ? 100
+        : Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
     primary = `${daysLeft} ${daysLeft === 1 ? "day" : "days"} left in ${year}`;
     secondary = `${Math.round(percent)}% of the year is gone — make the rest count`;
     target = yearEnd;
